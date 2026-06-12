@@ -3,7 +3,7 @@ os.environ["USE_TF"] = "NO"
 
 import streamlit as st
 import pandas as pd
-from operator import itemgetter
+import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -15,104 +15,223 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 # ==========================================
-# 1. JUDUL & KONFIGURASI FORMAL
+# 1. KONFIGURASI HALAMAN & CUSTOM CSS DARK MODE PERFECT
 # ==========================================
+st.set_page_config(
+    page_title="DIABETES AI Agent",
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
+st.markdown("""
+    <style>
+    /* 1. Background Utama Halaman: Hitam Agak Keabuan (Dark Charcoal) */
+    .stApp, [data-testid="stHeader"] {
+        background: linear-gradient(135deg, #1e1e24 0%, #121214 100%) !important;
+        color: #ffffff !important;
+        font-family: 'Inter', system-ui, sans-serif !important;
+    }
+
+    /* 2. Judul di Tengah Paling Atas (Warna Putih Bersinar) */
+    .center-title {
+        text-align: center;
+        font-size: 2.5rem !important;
+        font-weight: 800 !important;
+        color: #ffffff !important;
+        letter-spacing: -1px;
+        margin-top: -30px !important;
+        margin-bottom: 5px !important;
+    }
+    .center-subtitle {
+        text-align: center;
+        font-size: 0.95rem !important;
+        color: #cbd5e1 !important; /* Abu terang mendekati putih */
+        margin-bottom: 30px !important;
+    }
+
+    /* ==========================================
+       TARGET LOCK: STYLING CONTAINER TEMA GELAP
+       ========================================== */
+    
+    /* 1. Kotak Parameter Kiri - Neon Purple Border */
+    div[data-testid="column"]:nth-child(1) [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #1a1a1e !important;
+        border: 2px solid #a78bfa !important; /* Ungu Neon Soft */
+        border-radius: 20px !important;
+        padding: 20px !important;
+        box-shadow: 0 10px 30px rgba(167, 139, 250, 0.05) !important;
+    }
+
+    /* 2. Kotak Chat Kanan - Neon Pink Border */
+    div[data-testid="column"]:nth-child(2) [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #1a1a1e !important;
+        border: 2px solid #f472b6 !important; /* Pink Neon Soft */
+        border-radius: 24px !important;
+        padding: 25px !important;
+        box-shadow: 0 15px 35px rgba(244, 114, 182, 0.05) !important;
+    }
+
+    /* Mengatur kerapatan teks di kolom parameter */
+    div[data-testid="column"]:nth-child(1) [data-testid="stVerticalBlock"] {
+        gap: 0.35rem !important; 
+    }
+    .param-text {
+        font-size: 0.9rem !important;
+        font-weight: 600;
+        color: #ffffff !important; /* Font Putih Tegas */
+        margin-top: 5px !important;
+        margin-bottom: -8px !important;
+    }
+
+    /* Memaksa Semua Teks Streamlit di Dalam Chat Menjadi Putih */
+    .stChatMessage, .stChatMessage p, .stChatMessage span, .stChatMessage div, 
+    div[data-testid="stMarkdownContainer"] p, stCaption, .stCaption, div.stCaption {
+        color: #ffffff !important; 
+    }
+    
+    /* Judul kecil kolom */
+    h3 {
+        color: #ffffff !important;
+    }
+
+    /* Gaya Gelembung Chat di Ruang Gelap */
+    div[data-testid="stChatMessageAssistant"] {
+        background-color: #26262b !important; 
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 16px !important;
+    }
+    div[data-testid="stChatMessageUser"] {
+        background: #2e2a38 !important; /* Sentuhan ungu gelap */
+        border: 1px solid rgba(167, 139, 250, 0.3) !important;
+        border-radius: 16px !important;
+    }
+
+    /* Input Tempat Mengetik Chat */
+    [data-testid="stChatInput"] textarea {
+        color: #ffffff !important;
+    }
+    [data-testid="stChatInput"] > div {
+        background-color: #26262b !important;
+        border: 1.5px solid rgba(244, 114, 182, 0.4) !important;
+        border-radius: 16px !important;
+    }
+    
+    /* Teks Kode di dalam Parameter */
+    code {
+        color: #f472b6 !important; 
+        background-color: #26262b !important;
+        padding: 2px 6px !important;
+        border-radius: 6px !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Progress Bar Mode Gelap */
+    div.stProgress > div > div {
+        background-color: #2d2d34 !important;
+        border-radius: 20px !important;
+        height: 8px !important;
+    }
+    div.stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #a78bfa 0%, #f472b6 100%) !important; 
+        border-radius: 20px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# API Key Management
 try:
     os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 except:
-    # Jika di laptop (lokal), pakai kode API Key kamu langsung di bawah ini
     os.environ["GROQ_API_KEY"] = "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"
-st.set_page_config(page_title="Sistem Deteksi Diabetes", layout="wide")
-
-st.title("📊 Sistem Pakar Hybrid: Prediksi Diabetes Melitus Menggunakan MLP Classifier dan Retrieval-Augmented Generation (RAG)")
-st.write("Aplikasi skrining dini diabetes beserta analisis preventif berbasis korpus jurnal ilmiah.")
-st.markdown("---")
 
 # ==========================================
-# 2. TRAINING MODEL MLP (72% OPTIMAL)
+# 2. INTELIJEN MODEL LOGIC (MLP & RAG)
 # ==========================================
 @st.cache_resource
 def latih_dan_siapkan_mlp():
+    if not os.path.exists("diabetes.csv"):
+        st.error("File 'diabetes.csv' tidak ditemukan.")
+        st.stop()
     df = pd.read_csv("diabetes.csv")
     X = df.drop(columns=["Outcome"])
     y = df["Outcome"]
     X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
-    
-    model_mlp = MLPClassifier(
-        hidden_layer_sizes=(32, 16), activation='relu', solver='adam',
-        alpha=0.01, learning_rate_init=0.001, max_iter=500, random_state=42
-    )
+    model_mlp = MLPClassifier(hidden_layer_sizes=(32, 16), max_iter=500, random_state=42)
     model_mlp.fit(X_train_scaled, y_train)
     return model_mlp, scaler
 
 model_mlp, scaler_data = latih_dan_siapkan_mlp()
 
-# ==========================================
-# 3. INITIALIZE RAG JURNAL
-# ==========================================
 @st.cache_resource
 def inisialisasi_ai_jurnal_ringan():
-    daftar_jurnal = ["jurnal_folder/jurnal_neuropati.pdf", "jurnal_folder/jurnal_jantung.pdf", "jurnal_folder/jurnal_yoyo.pdf"]
+    jurnal_folder = "jurnal_folder"
+    if not os.path.exists(jurnal_folder):
+        return None
+    daftar_jurnal = [os.path.join(jurnal_folder, f) for f in os.listdir(jurnal_folder) if f.endswith(".pdf")]
+    if not daftar_jurnal:
+        return None
     dokumen_gabungan = []
     for jalur_file in daftar_jurnal:
         try:
             loader = PyPDFLoader(jalur_file)
             dokumen_gabungan.extend(loader.load())
         except: pass
-            
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     splits = text_splitter.split_documents(dokumen_gabungan)
-    retriever = BM25Retriever.from_documents(splits)
-    retriever.k = 3
-    return retriever
+    return BM25Retriever.from_documents(splits) if splits else None
 
 retriever_jurnal = inisialisasi_ai_jurnal_ringan()
 
-# Dapatkan Analisis RAG Formal & Interaktif
 def dapatkan_analisis_groq_chat(data_narasi, hasil_mlp, retriever):
-    llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0.3)
-    template = """Anda adalah "Dokter AI", pakar medis virtual yang ramah dan ilmiah.
-    Berikan laporan analisis hasil prediksi diabetes pasien dengan gaya chat yang santun, empati, dan terstruktur menggunakan Markdown.
-    
-    Aturan:
-    1. Tampilkan hasil prediksi MLP di baris paling atas secara mencolok.
-    2. Berikan poin analisis data klinis pasien berdasarkan keluhan yang disampaikan.
-    3. Hubungkan secara ilmiah keluhan pasien (seperti riwayat diet, gejala, dll) dengan fakta dari Konteks Jurnal 2026.
-    4. Berikan saran preventif konkret (gaya hidup, tes lab HbA1c).
+    if not retriever:
+        context_docs = "Tidak ada literatur jurnal tersedia."
+    else:
+        docs = retriever.invoke(data_narasi)
+        context_docs = "\n\n".join(doc.page_content for doc in docs)
 
-    Konteks Jurnal 2026: {context}
-    Narasi Pasien: {input_data}
-    Hasil Prediksi Awal MLP: {prediction_mlp}
+    llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0.3)
+    template = """Anda adalah "Dokter AI" dari PT Bukhori Group.
+    Berikan laporan analisis hasil prediksi diabetes pasien dengan format Markdown yang rapi.
+    
+    Aturan Penulisan:
+    1. Tampilkan '{prediction_mlp}' di baris paling atas sebagai HEADLINE BESAR (Gunakan #).
+    2. Cetak TEBAL (BOLD) poin-poin penting, parameter klinis, dan angka hasil laboratorium pasien.
+    3. Tuliskan analisis hubungan dengan Konteks Jurnal 2026 secara singkat.
+    4. Berikan saran preventif (Gaya hidup & Tes HbA1c).
+
+    ### Konteks Jurnal 2026:
+    {context}
+    ### Data Klinis:
+    {input_data}
+    ### Hasil Prediksi:
+    {prediction_mlp}
     """
     prompt = ChatPromptTemplate.from_template(template)
-    format_docs = lambda docs: "\n\n".join(doc.page_content for doc in docs)
-    rag_chain = (
-        {"context": itemgetter("input_data") | retriever | format_docs, "input_data": itemgetter("input_data"), "prediction_mlp": itemgetter("prediction_mlp")}
-        | prompt | llm | StrOutputParser()
-    )
-    return rag_chain.invoke({"input_data": data_narasi, "prediction_mlp": hasil_mlp})
+    rag_chain = prompt | llm | StrOutputParser()
+    return rag_chain.invoke({"context": context_docs, "input_data": data_narasi, "prediction_mlp": hasil_mlp})
 
 # ==========================================
-# 4. MEMORI PERCAKAPAN & STATE WAWANCARA
+# 3. MEMORI PERCAKAPAN & STATE MANAGEMENT
 # ==========================================
-# Daftar pertanyaan berurutan untuk mengisi 8 parameter Pima Indians
 PERTANYAAN = [
-    "1. Berapa jumlah kehamilan Anda? (Ketik 0 jika Anda laki-laki)",
-    "2. Berapa kadar Gula Darah (Glucose) Anda saat puasa / setelah makan?",
-    "3. Berapa Tekanan Darah (Diastolic) Anda? (Contoh: 80)",
-    "4. Berapa nilai Ketebalan Kulit (Skin Thickness) tricep Anda? (Ketik 0 jika tidak tahu)",
+    "1. Berapa jumlah kehamilan Anda? (Ketik 0 jika laki-laki)",
+    "2. Berapa kadar Gula Darah (Glucose) puasa Anda saat ini?",
+    "3. Berapa Tekanan Darah Diastolik Anda? (Contoh: 80)",
+    "4. Berapa nilai Ketebalan Kulit (Skin Thickness) Anda? (Ketik 0 jika tidak tahu)",
     "5. Berapa kadar Insulin Anda dalam darah? (Ketik 0 jika tidak tahu)",
-    "6. Berapa nilai BMI (Indeks Massa Tubuh) Anda? (Ketik 0 jika tidak tahu)",
-    "7. Berapa nilai Diabetes Pedigree Function (faktor keturunan) Anda? (Ketik 0.5 jika tidak tahu)",
+    "6. Berapa nilai BMI (Indeks Massa Tubuh) Anda?",
+    "7. Berapa nilai Diabetes Pedigree Function Anda? (Ketik 0.5 jika tidak tahu)",
     "8. Berapa usia Anda saat ini?",
-    "Terima kasih! Terakhir, apakah Anda memiliki keluhan lain? (Misal: berat badan naik turun/diet yoyo, sering kesemutan, atau mudah lelah?)"
+    "Terakhir, apakah Anda memiliki keluhan kesehatan lain saat ini?"
 ]
 
+NAMA_PARAMETER = ["Pregnancies", "Glucose", "Blood Pressure", "Skin Thickness", "Insulin", "BMI", "Diabetes Pedigree", "Age"]
+
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Halo, saya Dokter AI. Saya akan membantu Anda melakukan skrining risiko diabetes secara mandiri. Mari kita mulai dengan beberapa pertanyaan klinis.\n\n" + PERTANYAAN[0]}]
+    st.session_state.messages = [{"role": "assistant", "content": "Halo, saya Dokter AI. Mari kita lakukan skrining dini diabetes.\n\n" + PERTANYAAN[0]}]
 if "step" not in st.session_state:
     st.session_state.step = 0
 if "user_data" not in st.session_state:
@@ -120,82 +239,139 @@ if "user_data" not in st.session_state:
 if "narasi_keluhan" not in st.session_state:
     st.session_state.narasi_keluhan = ""
 
-# Tampilkan riwayat chat
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
 # ==========================================
-# 5. AKSI INPUT CHAT USER (VERSI ANTI-ASAL)
+# 4. IMPLEMENTASI LAYOUT 
 # ==========================================
-if user_input := st.chat_input("Ketik jawaban Anda di sini..."):
-    current_step = st.session_state.step
-    input_valid = True
-    angka_terdeteksi = 0.0
 
-    # 1. Validasi Angka untuk Langkah 0 sampai 7
-    if current_step < 8:
-        try:
-            # Cari angka di dalam teks input user
-            list_angka = [s for s in user_input.split() if s.replace('.', '', 1).isdigit()]
-            if len(list_angka) > 0:
-                angka_terdeteksi = float(list_angka[0])
+# 1. Judul Aplikasi di Tengah Paling Atas
+st.markdown('<div class="center-title">🤖 CHAT BOT: SCREENING DIABETES</div>', unsafe_allow_html=True)
+st.markdown('<div class="center-subtitle">Hybrid Machine Learning & RAG Analysis </div>', unsafe_allow_html=True)
+
+# 2. Pembagian Kolom Bawah: Kiri vs Kanan
+col_info, col_chat = st.columns([1, 1.4], gap="medium")
+
+# --- PANEL SEBELAH KIRI: DIABETES PARAMETERS (SEMUA PARAMETER DENGAN BAR KUSTOM) ---
+with col_info:
+    st.markdown('<h3 style="font-size:1.1rem; font-weight:700; margin-bottom:5px;">📋 Diabetes Parameters</h3>', unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        if len(st.session_state.user_data) == 0:
+            st.markdown('<p style="color:#a0aec0; font-size:0.85rem; margin-bottom:10px;">Belum ada data klinis yang diinput.</p>', unsafe_allow_html=True)
+            # Tampilan awal: Semua bar kosong/mati sebelum diinput
+            for name in NAMA_PARAMETER:
+                st.markdown(f'<p class="param-text" style="color:#a0aec0 !important;">{name}</p>', unsafe_allow_html=True)
+                st.markdown("""
+                    <div style="background-color: #2d2d34; border-radius: 10px; width: 100%; height: 8px; overflow: hidden; margin-top: 5px; margin-bottom: 15px;">
+                        <div style="background: #2d2d34; width: 0%; height: 100%;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            # Tampilkan parameter yang sudah diisi oleh user
+            for i, val in enumerate(st.session_state.user_data):
+                param_name = NAMA_PARAMETER[i]
+                
+                # Kalkulasi persentase bar dinamis biar proporsional
+                if param_name == "Glucose":
+                    persen_bar = min((val / 200.0) * 100, 100.0)
+                    satuan = "mg/dL"
+                elif param_name == "BMI":
+                    persen_bar = min((val / 50.0) * 100, 100.0)
+                    satuan = "kg/m²"
+                elif param_name == "Blood Pressure":
+                    persen_bar = min((val / 150.0) * 100, 100.0)
+                    satuan = "mmHg"
+                elif param_name == "Age":
+                    persen_bar = min((val / 100.0) * 100, 100.0)
+                    satuan = "years"
+                else:
+                    persen_bar = min((val / 100.0) * 100, 100.0) if val > 0 else 0.0
+                    satuan = ""
+
+                # Render Teks & Bar HTML Kustom untuk data yang sudah ada
+                st.markdown(f'<p class="param-text">{param_name}: <code>{val} {satuan}</code></p>', unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style="background-color: #2d2d34; border-radius: 10px; width: 100%; height: 8px; overflow: hidden; margin-top: 5px; margin-bottom: 15px;">
+                        <div style="background: linear-gradient(90deg, #a78bfa 0%, #f472b6 100%); width: {persen_bar}%; height: 100%; border-radius: 10px; transition: width 0.5s ease-in-out;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # Tampilkan sisa parameter yang belum dijawab sebagai placeholder abu-abu
+            sisa = len(NAMA_PARAMETER) - len(st.session_state.user_data)
+            for j in range(sisa):
+                idx = len(st.session_state.user_data) + j
+                st.markdown(f'<p class="param-text" style="color:#a0aec0 !important;">{NAMA_PARAMETER[idx]}</p>', unsafe_allow_html=True)
+                st.markdown("""
+                    <div style="background-color: #2d2d34; border-radius: 10px; width: 100%; height: 8px; overflow: hidden; margin-top: 5px; margin-bottom: 15px;">
+                        <div style="background: #2d2d34; width: 0%; height: 100%;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+# --- PANEL SEBELAH KANAN: CHAT BOX ---
+with col_chat:
+    st.markdown('<h3 style="font-size:1.1rem; font-weight:700; margin-bottom:5px;">💬 Room Chat Agent</h3>', unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.markdown('<div style="text-align: center; font-weight:700; color:#cbd5e1; font-size:0.9rem;">✨ Ask our AI Anything</div>', unsafe_allow_html=True)
+        st.markdown("<hr style='margin:10px 0; border-color: rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+
+        if st.session_state.messages:
+            pesan_terakhir = st.session_state.messages[-1]
+            if pesan_terakhir["role"] == "user" and len(st.session_state.messages) > 1:
+                pesan_tampil = st.session_state.messages[-2:]
             else:
-                # Jika tidak ada angka sama sekali di ketikan user
-                input_valid = False
-        except:
-            input_valid = False
-    else:
-        # Langkah ke-9 (Keluhan tambahan bebas teks murni)
-        st.session_state.narasi_keluhan = user_input
+                pesan_tampil = [pesan_terakhir]
+                
+            for msg in pesan_tampil:
+                if "Halo, saya Dokter AI" in msg["content"]:
+                    if "\n\n" in msg["content"]:
+                        msg_clean = msg["content"].split("\n\n")[-1]
+                        with st.chat_message("assistant"): st.markdown(msg_clean)
+                    else:
+                        with st.chat_message("assistant"): st.markdown(msg["content"])
+                    continue
+                with st.chat_message(msg["role"]): 
+                    st.markdown(msg["content"])
 
-    # 2. Jika Input Valid, Jalankan Alur Chat
-    if input_valid:
-        # Tampilkan chat user ke layar
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # Form Chat Input
+    if user_input := st.chat_input("Type your answer here..."):
         st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
+        current_step = st.session_state.step
+        total_questions = len(PERTANYAAN)
 
-        if current_step < 8:
-            st.session_state.user_data.append(angka_terdeteksi)
+        if current_step < (total_questions - 1):
+            try:
+                list_angka = [s for s in user_input.split() if s.replace('.', '', 1).isdigit()]
+                if not list_angka: raise ValueError
+                st.session_state.user_data.append(float(list_angka[0]))
+                step_lanjut = True
+            except:
+                step_lanjut = False
+                st.session_state.messages.append({"role": "assistant", "content": f"⚠️ **Format Angka Salah.** Sila ulangi untuk '{NAMA_PARAMETER[current_step]}'.\n\n*Soal:* {PERTANYAAN[current_step]}"})
+        else:
+            st.session_state.narasi_keluhan = user_input
+            step_lanjut = True
 
-        # Naikkan langkah ke pertanyaan berikutnya
-        st.session_state.step += 1
-        next_step = st.session_state.step
+        if step_lanjut:
+            st.session_state.step += 1
+            next_step = st.session_state.step
 
-        with st.chat_message("assistant"):
-            if next_step < len(PERTANYAAN):
-                respons_bot = PERTANYAAN[next_step]
-                st.markdown(respons_bot)
-                st.session_state.messages.append({"role": "assistant", "content": respons_bot})
-            
-            elif next_step == len(PERTANYAAN):
-                with st.spinner("Dokter AI sedang memproses data klinis Anda pada model MLP & RAG Jurnal..."):
-                    try:
-                        fitur_mlp = st.session_state.user_data[:8]
-                        data_df = pd.DataFrame([fitur_mlp])
-                        data_scaled = scaler_data.transform(data_df)
-                        prediksi = model_mlp.predict(data_scaled)[0]
-                        
-                        hasil_mlp = "🚨 HASIL PREDIKSI MLP: POSITIVE DIABETES (72.0% Accuracy)" if prediksi == 1 else "🟢 HASIL PREDIKSI MLP: NEGATIVE DIABETES (72.0% Accuracy)"
-                        ringkasan_kasus = f"Data parameter medis: {fitur_mlp}. Keluhan tambahan pasien: {st.session_state.narasi_keluhan}"
-                        respons_final = dapatkan_analisis_groq_chat(ringkasan_kasus, hasil_mlp, retriever_jurnal)
-                    except Exception as e:
-                        respons_final = f"Terjadi kesalahan sistem: {str(e)}."
+            if next_step < total_questions:
+                st.session_state.messages.append({"role": "assistant", "content": PERTANYAAN[next_step]})
+            elif next_step == total_questions:
+                st.session_state.messages.append({"role": "assistant", "content": "## Sedang Memproses Hasil..."})
+                try:
+                    fitur_mlp = st.session_state.user_data[:8]
+                    if len(fitur_mlp) < 8: fitur_mlp += [0.0] * (8 - len(fitur_mlp))
+                    data_df = pd.DataFrame([fitur_mlp])
+                    data_scaled = scaler_data.transform(data_df)
+                    prediksi = model_mlp.predict(data_scaled)[0]
                     
-                    st.markdown(respons_final)
-                    st.session_state.messages.append({"role": "assistant", "content": respons_final})
-                    st.info("Obrolan selesai. Jika ingin mencoba lagi, silakan refresh (F5) halaman browser Anda.")
-
-    # 3. Jika Input SALAH (Ketik Asal), Tolak dan Minta Ketik Ulang
-    else:
-        # Tampilkan chat asal user agar tetap interaktif
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
-            
-        # Peringatan dari Dokter AI
-        pesan_peringatan = f"⚠️ **Format Salah.** Mohon masukkan nilai berupa **angka** yang valid untuk parameter ini.\n\n*Ulangi Pertanyaan:* {PERTANYAAN[current_step]}"
-        with st.chat_message("assistant"):
-            st.markdown(pesan_peringatan)
-        st.session_state.messages.append({"role": "assistant", "content": pesan_peringatan})
+                    hasil_mlp = "# 🔴 POSITIVE DIABETES (72.0% Accuracy)" if prediksi == 1 else "# 🟢 NEGATIVE DIABETES (72.0% Accuracy)"
+                    ringkasan_kasus = f"Pasien: Glucose={fitur_mlp[1]}, BMI={fitur_mlp[5]}. Keluhan: {st.session_state.narasi_keluhan}"
+                    respons_final = dapatkan_analisis_groq_chat(ringkasan_kasus, hasil_mlp, retriever_jurnal)
+                except Exception as e:
+                    respons_final = f"Terjadi gangguan teknis: {str(e)}"
+                st.session_state.messages.append({"role": "assistant", "content": respons_final})
+        st.rerun()
